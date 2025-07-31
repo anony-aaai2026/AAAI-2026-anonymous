@@ -13,7 +13,7 @@ pip install -r requirements.txt
 ## Running the code
 - Toy example:
 ```
- python toy_example.py
+python toy_example.py
 ```
 
 - Real world data:
