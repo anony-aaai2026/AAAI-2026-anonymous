@@ -7,7 +7,7 @@ This repository contains code to reproduce the results in our AAAI 2026 submissi
 - Python 3.11.7
 - Required packages (install with pip):
 
-```bash
+```
 pip install -r requirements.txt
 
 ## Requirements
