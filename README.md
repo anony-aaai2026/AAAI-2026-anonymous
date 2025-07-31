@@ -11,7 +11,7 @@ This repository contains code to reproduce the results in our AAAI 2026 submissi
 pip install -r requirements.txt
 
 pip install numpy scipy matplotlib scikit-learn pandas
-Running the Code
+## Requirements
 Toy Example:
 bash
 Copy
