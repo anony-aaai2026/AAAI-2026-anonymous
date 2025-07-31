@@ -1,4 +1,4 @@
-# AAAI toy example, cost-aware
+# AAAI 2026 code: toy example
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
