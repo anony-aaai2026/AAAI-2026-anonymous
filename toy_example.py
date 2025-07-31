@@ -52,7 +52,6 @@ beta_features = true_beta[:, 1:]
 D_L_aug = np.hstack((np.ones((D_L_x.shape[0], 1)), D_L_x))
 H_inv = np.linalg.pinv(D_L_aug.T @ D_L_aug)  # Use pseudo-inverse for stability
 beta_prev = H_inv @ D_L_aug.T @ D_L_y
-print(beta_prev)
 
 D_L_aug = np.hstack((np.ones((D_L_x.shape[0], 1)), D_L_x))
 H_inv = np.linalg.pinv(D_L_aug.T @ D_L_aug)  # Use pseudo-inverse for stability
@@ -284,8 +283,6 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
     
 
 
-print(beta_prev.copy())
-
 # Run both ovbal and oqbcal in cost_aware
 results_ovbal_sc = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=True, model= "ovbal",
@@ -334,7 +331,6 @@ sigma_y_ovbal=results_ovbal_sc[15]
 sigma_y_bia=results_bia_sc[15]
 sigma_y_rs=results_rs_sc[15]
 
-print(beta_prev.copy())
 
 results_ovbal_bc = online_active_learning(D_L_x, D_L_y, D_U,lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha, cost_aware=True,  model= "ovbal",
@@ -372,6 +368,9 @@ label_count_ovbal_bc_no=results_ovbal_bc_no[6]
 cost_ovbal_bc_no=results_ovbal_bc_no[3]
 utility_ovbal_bc_no=results_ovbal_bc_no[7]
 
+mu_ovbal_history =results_ovbal_sc[10]
+var_ovbal_history=results_ovbal_sc[11]
+score_history=results_ovbal_sc[12]
 
 
 
@@ -381,7 +380,7 @@ per_feature_err_sl = compute_per_feature_tracking_error(beta_bia, true_beta)
 per_feature_err_rs = compute_per_feature_tracking_error(beta_rs, true_beta)
 
 plt.rcParams.update({
-    "font.family": "serif",         # AAAI prefers serif fonts
+    "font.family": "serif",         
     "font.size": 20,
     "axes.titlesize": 18,
     "axes.labelsize": 20,
@@ -412,102 +411,7 @@ plt.savefig("per_feature_beta_tracking_error.pdf")
 plt.show()
 
 
-fig, axs = plt.subplots(1, 3, figsize=(20, 4.5), sharey=True)
-methods = ["ovbal",  "Bia", "RS"]
-betas = [beta_ovbal, beta_bia, beta_rs]
-linestyles = ["--", ":"]
 
-for i, ax in enumerate(axs):
-    for j in range(true_beta.shape[1]):
-        ax.plot(true_beta[:, j], linestyle=linestyles[0], label=f"True $β_{j}$" if i == 0 else "")
-        ax.plot(betas[i][:, j], linestyle=linestyles[1], label=f"Estimated $β_{j}$" if i == 0 else "")
-    ax.set_xlabel("Time step")
-    if i == 0:
-        ax.set_ylabel("β value")
-    ax.grid(False)
-# Add legend only once
-axs[0].legend(loc="upper left", ncol=1)
-plt.tight_layout()
-plt.savefig("beta_evolution_all_methods.pdf")
-plt.show()
-
-plt.figure(figsize=(10, 4))
-plt.plot(h_inv_ovbal, label="OVBAL", linewidth=2)
-plt.plot(h_inv_bia, label="BIA", linestyle="--", linewidth=2)
-plt.plot(h_inv_rs, label="RS", linestyle=":", linewidth=2)
-plt.xlabel("Time step")
-plt.ylabel("$H_{t}^{-1}$")
-plt.legend()
-plt.grid(False)
-plt.tight_layout()
-plt.savefig("ht-1_all_models.pdf")
-plt.show()
-
-
-plt.figure(figsize=(10, 4))
-plt.plot(sigma_y_ovbal, label="OVBAL", linewidth=2)
-plt.plot(sigma_y_bia, label="BIA", linestyle="--", linewidth=2)
-plt.plot(sigma_y_rs,label="RS", linestyle=":", linewidth=2)
-plt.xlabel("Time step")
-plt.ylabel("$σ_{y}^{2}$")
-plt.legend()
-plt.grid(False)
-plt.tight_layout()
-plt.savefig("sigma_y_all_models.pdf")
-plt.show()
-
-
-plt.figure(figsize=(10, 4))
-plt.plot(var_beta_ovbal, label="OVBAL", linewidth=2)
-plt.plot(var_beta_bia, label="BIA", linestyle="--", linewidth=2)
-plt.plot(var_beta_rs, label="RS", linestyle=":", linewidth=2)
-plt.xlabel("Time step")
-plt.ylabel("Trace of Var($\\beta$)")
-plt.legend()
-plt.grid(False)
-plt.tight_layout()
-plt.savefig("trace_var_beta_all_models.pdf")
-plt.show()
-
-
-
-
-fig, axs = plt.subplots(1, 3, figsize=(16, 4.5))
-methods = ["ovbal",  "Bia", "RS"]
-true_utils = [true_util_ovbal,  true_util_bia, true_util_rs]
-est_utils = [est_util_ovbal,  est_util_bia, est_util_rs]
-for i, ax in enumerate(axs.flatten()):
-    ax.plot(true_utils[i], label="True Utility", linestyle='-')
-    ax.plot(est_utils[i], label="Estimated Utility", linestyle='--')
-    ax.set_xlabel("Query Step")
-    ax.set_ylabel("Utility")
-    ax.legend()
-    ax.grid(False)
-plt.tight_layout()
-plt.savefig("utility_over_time_subplots.pdf")
-plt.show()
-
-
-
-
-fig, axs = plt.subplots(1, 3, figsize=(20, 4.5), sharey=True)
-methods = ["ovbal", "Bia", "RS"]
-betas = [beta_ovbal,beta_bia, beta_rs]
-linestyles = ["--", ":"]
-n_features = beta_ovbal.shape[1]  # Fix here
-for i, ax in enumerate(axs):
-    for j in range(n_features):
-        ax.plot(betas[i][:, j], linestyle=linestyles[1], label=f"Estimated $β_{j}$" if i == 0 else "")
-    ax.set_xlabel("Time step")
-    if i == 0:
-        ax.set_ylabel("β value")
-    ax.grid(False)
-
-# Add legend only once
-axs[0].legend(loc="upper left", ncol=1)
-plt.tight_layout()
-plt.savefig("beta_evolution_all_methods.pdf")
-plt.show()
 
 
 # Align learner curves to baseline final MSE at t=0
@@ -530,22 +434,6 @@ for t in range(len(D_U)):
     mse_no_update.append(mse)
 
 initial_mse = mse_no_update[-1] / len(D_U)
-
-
-baseline_curve = [initial_mse] * len(avg_mse_ovbal)  # constant line for baseline
-plt.figure(figsize=(7.2, 4.5))
-plt.plot(avg_mse_ovbal, label="OVBAL", linestyle="-")
-plt.plot(avg_mse_bia, label="BIA", linestyle="-.")
-plt.plot(avg_mse_rs, label="RS", linestyle="--")
-plt.xlabel("Time step", fontsize=13)
-plt.ylabel("Forecasting MSE", fontsize=13)
-plt.xticks(fontsize=11)
-plt.yticks(fontsize=11)
-plt.legend(loc="upper right", fontsize=11)
-plt.grid(False)
-plt.tight_layout()
-plt.savefig("mse_vs_time_aligned.pdf")
-plt.show()
 
 
 def extract_query_mse(mse_list, cost_list):
@@ -602,17 +490,17 @@ avg_mse_all = [avg_mse_ovbal,  avg_mse_bia, avg_mse_rs]
 costs_all = [cost_ovbal, cost_bia, cost_rs]
 colors = ["blue", "green", "red"]
 
-plt.figure(figsize=(7.5, 5))
-for method, mse_hist, cost_hist, color in zip(methods, avg_mse_all, costs_all, colors):
-    x, y = extract_query_mse(mse_hist, cost_hist)
-    plt.plot(range(1, len(y) + 1), y, label=method, linestyle="-", linewidth=2)
-plt.xlabel("Queried Labels")
-plt.ylabel("Forecasting MSE")
-plt.legend()
-plt.grid(False)
-plt.tight_layout()
-plt.savefig("mse_vs_queried_labels.pdf")
-plt.show()
+# plt.figure(figsize=(7.5, 5))
+# for method, mse_hist, cost_hist, color in zip(methods, avg_mse_all, costs_all, colors):
+#     x, y = extract_query_mse(mse_hist, cost_hist)
+#     plt.plot(range(1, len(y) + 1), y, label=method, linestyle="-", linewidth=2)
+# plt.xlabel("Queried Labels")
+# plt.ylabel("Forecasting MSE")
+# plt.legend()
+# plt.grid(False)
+# plt.tight_layout()
+# plt.savefig("mse_vs_queried_labels.pdf")
+# plt.show()
 
 
 def extract_query_cost_mse_threshold(mse_hist, cost_hist, threshold=np.inf):
@@ -669,33 +557,33 @@ plt.savefig("mse_vs_cost_spent_zoom_compare.pdf")
 plt.show()
 
 
-def extract_query_cost_mse_threshold(mse_hist, cost_hist, threshold=10000):
-    query_costs = []
-    query_mse = []
-    last_cost = 0
-    for i in range(len(cost_hist)):
-        if i >= len(mse_hist):
-            break
-        if cost_hist[i] > last_cost:
-            if cost_hist[i] > threshold:
-                break
-            query_costs.append(cost_hist[i])
-            query_mse.append(mse_hist[i])
-            last_cost = cost_hist[i]
-    return query_costs, query_mse
-methods = ["OVBAL", "BIA", "RS"]
-mse_all = [avg_mse_ovbal,  avg_mse_bia, avg_mse_rs]
-cost_all = [cost_ovbal, cost_bia, cost_rs]
-plt.figure(figsize=(7, 4.2))
-for m, mse, cost in zip(methods, mse_all, cost_all):
-    q_costs, q_mses = extract_query_cost_mse_threshold(mse, cost, threshold=10000)
-    plt.plot(q_costs, q_mses, label=m)
-plt.xlabel("Cost Spent")
-plt.ylabel("Forecasting MSE")
-plt.legend()
-plt.grid(False)
-plt.tight_layout()
-plt.show()
+# def extract_query_cost_mse_threshold(mse_hist, cost_hist, threshold=10000):
+#     query_costs = []
+#     query_mse = []
+#     last_cost = 0
+#     for i in range(len(cost_hist)):
+#         if i >= len(mse_hist):
+#             break
+#         if cost_hist[i] > last_cost:
+#             if cost_hist[i] > threshold:
+#                 break
+#             query_costs.append(cost_hist[i])
+#             query_mse.append(mse_hist[i])
+#             last_cost = cost_hist[i]
+#     return query_costs, query_mse
+# methods = ["OVBAL", "BIA", "RS"]
+# mse_all = [avg_mse_ovbal,  avg_mse_bia, avg_mse_rs]
+# cost_all = [cost_ovbal, cost_bia, cost_rs]
+# plt.figure(figsize=(7, 4.2))
+# for m, mse, cost in zip(methods, mse_all, cost_all):
+#     q_costs, q_mses = extract_query_cost_mse_threshold(mse, cost, threshold=10000)
+#     plt.plot(q_costs, q_mses, label=m)
+# plt.xlabel("Cost Spent")
+# plt.ylabel("Forecasting MSE")
+# plt.legend()
+# plt.grid(False)
+# plt.tight_layout()
+# plt.show()
 
 
 
@@ -728,23 +616,47 @@ fig.tight_layout()
 plt.savefig("cumulative_cost_toy.pdf")
 plt.show()
 
-methods = ["ovbal", "Bia", "RS"]
-final_utilities = [utility_ovbal_sc,  utility_bia_sc, utility_rs_sc]
-final_costs = [cost_ovbal[-1],  cost_bia[-1], cost_rs[-1]]
-efficiency = np.array(final_utilities) / np.array(final_costs)
-plt.figure(figsize=(6.5, 4.2))
-x = np.arange(len(methods))
-plt.bar(x, efficiency, tick_label=methods)
-plt.ylabel("Utility / Cost (Efficiency)")
+
+
+
+
+
+
+# --- Follwed by further analysis which is not included in the main paper ---
+
+baseline_curve = [initial_mse] * len(avg_mse_ovbal)  # constant line for baseline
+plt.figure(figsize=(7.2, 4.5))
+plt.plot(avg_mse_ovbal, label="OVBAL", linestyle="-")
+plt.plot(avg_mse_bia, label="BIA", linestyle="-.")
+plt.plot(avg_mse_rs, label="RS", linestyle="--")
+plt.xlabel("Time step", fontsize=13)
+plt.ylabel("Forecasting MSE", fontsize=13)
+plt.xticks(fontsize=11)
+plt.yticks(fontsize=11)
+plt.legend(loc="upper right", fontsize=11)
+plt.grid(False)
 plt.tight_layout()
-plt.savefig("efficiency_sc.pdf")
+plt.savefig("mse_vs_time_aligned.pdf")
 plt.show()
 
+fig, axs = plt.subplots(1, 4, figsize=(20, 4.5), sharey=True)
+methods = ["True","ovbal", "Bia", "RS"]
+betas =[true_beta, beta_ovbal,beta_bia, beta_rs]
+linestyles = ["--", ":"]
+n_features = beta_ovbal.shape[1]  # Fix here
+for i, ax in enumerate(axs):
+    for j in range(n_features):
+        ax.plot(betas[i][:, j], linestyle=linestyles[1], label=f"Estimated $β_{j}$" if i == 0 else "")
+    ax.set_xlabel("Time step")
+    if i == 0:
+        ax.set_ylabel("β value")
+    ax.grid(False)
 
-
-mu_ovbal_history =results_ovbal_sc[10]
-var_ovbal_history=results_ovbal_sc[11]
-score_history=results_ovbal_sc[12]
+# Add legend only once
+axs[0].legend(loc="upper left", ncol=1)
+plt.tight_layout()
+plt.savefig("beta_evolution_all_methods.pdf")
+plt.show()
 
 # --- Plot: Uncertainty score vs tau ---
 plt.figure(figsize=(7, 4))
@@ -830,5 +742,113 @@ plt.grid(False)
 plt.tight_layout()
 plt.savefig("utility_vs_threshold.pdf")
 plt.show()
+
+
+plt.figure(figsize=(10, 4))
+plt.plot(h_inv_ovbal, label="OVBAL", linewidth=2)
+plt.plot(h_inv_bia, label="BIA", linestyle="--", linewidth=2)
+plt.plot(h_inv_rs, label="RS", linestyle=":", linewidth=2)
+plt.xlabel("Time step")
+plt.ylabel("$H_{t}^{-1}$")
+plt.legend()
+plt.grid(False)
+plt.tight_layout()
+plt.savefig("ht-1_all_models.pdf")
+plt.show()
+
+
+plt.figure(figsize=(10, 4))
+plt.plot(sigma_y_ovbal, label="OVBAL", linewidth=2)
+plt.plot(sigma_y_bia, label="BIA", linestyle="--", linewidth=2)
+plt.plot(sigma_y_rs,label="RS", linestyle=":", linewidth=2)
+plt.xlabel("Time step")
+plt.ylabel("$σ_{y}^{2}$")
+plt.legend()
+plt.grid(False)
+plt.tight_layout()
+plt.savefig("sigma_y_all_models.pdf")
+plt.show()
+
+
+plt.figure(figsize=(10, 4))
+plt.plot(var_beta_ovbal, label="OVBAL", linewidth=2)
+plt.plot(var_beta_bia, label="BIA", linestyle="--", linewidth=2)
+plt.plot(var_beta_rs, label="RS", linestyle=":", linewidth=2)
+plt.xlabel("Time step")
+plt.ylabel("Trace of Var($\\beta$)")
+plt.legend()
+plt.grid(False)
+plt.tight_layout()
+plt.savefig("trace_var_beta_all_models.pdf")
+plt.show()
+
+
+fig, axs = plt.subplots(1, 3, figsize=(16, 4.5))
+methods = ["ovbal",  "Bia", "RS"]
+true_utils = [true_util_ovbal,  true_util_bia, true_util_rs]
+est_utils = [est_util_ovbal,  est_util_bia, est_util_rs]
+for i, ax in enumerate(axs.flatten()):
+    ax.plot(true_utils[i], label="True Utility", linestyle='-')
+    ax.plot(est_utils[i], label="Estimated Utility", linestyle='--')
+    ax.set_xlabel("Query Step")
+    ax.set_ylabel("Utility")
+    ax.legend()
+    ax.grid(False)
+plt.tight_layout()
+plt.savefig("utility_over_time_subplots.pdf")
+plt.show()
+
+
+
+plt.plot(l_j_history, label="Cost-Aware")
+plt.plot(l_j_history_no, label="No-Cost-Aware")
+plt.xlabel("Time step")
+plt.ylabel("$\\hat{l}_j$")
+plt.legend()
+plt.tight_layout()
+plt.savefig("lt_diffrence_in_cost_aware.pdf")
+plt.show()
+
+# plot tabel for comparing cost-aware and no cost-aware OVBAL, BIA, RS
+
+methods = ["OVBAL", "BIA", "RS"]
+schemes = ["SC", "BC"]
+
+# SC results
+final_mse_sc = [avg_mse_ovbal[-1], avg_mse_bia[-1], avg_mse_rs[-1]]
+labels_sc = [label_count_ovbal, label_count_bia, label_count_rs]
+costs_sc = [cost_ovbal[-1], cost_bia[-1], cost_rs[-1]]
+utils_sc = [utility_ovbal_sc, utility_bia_sc, utility_rs_sc]
+eff_sc = np.array(utils_sc) / (np.array(costs_sc) + 1e-8)
+
+# BC results
+final_mse_bc = [results_ovbal_bc[4][-1], results_bia_bc[4][-1], results_rs_bc[4][-1]]
+labels_bc = [results_ovbal_bc[6], results_bia_bc[6], results_rs_bc[6]]
+costs_bc = [results_ovbal_bc[3][-1], results_bia_bc[3][-1], results_rs_bc[3][-1]]
+utils_bc = [results_ovbal_bc[7], results_bia_bc[7], results_rs_bc[7]]
+eff_bc = np.array(utils_bc) / (np.array(costs_bc) + 1e-8)
+
+# No update
+mse_noupdate = initial_mse
+
+
+
+print("=== Table: Forecasting MSE and Efficiency (ΔMSE / Cost) ===")
+print(f"{'Method':<8} | {'Scheme':<4} | {'MSE':<10} | {'#Labels':<8} | {'Cost':<10} | {'ΔMSE/Cost':<12}")
+print("-" * 80)
+
+for i in range(len(methods)):
+    delta = mse_noupdate - final_mse_sc[i]
+    eff = delta / (costs_sc[i] + 1e-8)
+    print(f"{methods[i]:<8} | {'SC':<4} | {final_mse_sc[i]:<10.4f} | {labels_sc[i]:<8} | {costs_sc[i]:<10.1f} | {eff:<12.2f}")
+
+for i in range(len(methods)):
+    delta = mse_noupdate - final_mse_bc[i]
+    eff = delta / (costs_bc[i] + 1e-8)
+    print(f"{methods[i]:<8} | {'BC':<4} | {final_mse_bc[i]:<10.4f} | {labels_bc[i]:<8} | {costs_bc[i]:<10.1f} | {eff:<12.2f}")
+
+print(f"{'NoUpdate':<8} | {'–':<4} | {mse_noupdate:<10.4f} | {0:<8} | {0.0:<10.1f} | {'0.00':<12}")
+
+
 
 
