@@ -1,4 +1,4 @@
-# AAAI 2026 code: toy example
+# Code for AAAI 2026: toy example
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
@@ -83,7 +83,7 @@ def update_tau_online(mu_ovbal, var_ovbal, score_t, lambda_factor, alpha):
 
 def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev, 
                            label_budget, alpha, cost_aware, model,
-                           phi, eta_t, verbose, scheme):
+                           phi, eta_t, scheme):
     beta_t_history, H_t_inverse_history, smooth_mse_history, cost_history, forecast_error_history = [], [], [], [],[]
     tau_ovbal_history = []
     mu_ovbal_history=[]
@@ -286,13 +286,13 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
 # Run both ovbal and oqbcal in cost_aware
 results_ovbal_sc = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=True, model= "ovbal",
-                           phi=phi, eta_t= eta_t, verbose=True, scheme="SC")
+                           phi=phi, eta_t= eta_t, scheme="SC")
 results_bia_sc = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor,beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=True, model= "Bia",
-                           phi=phi, eta_t= eta_t, verbose=False, scheme="SC")
+                           phi=phi, eta_t= eta_t, scheme="SC")
 results_rs_sc = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor,beta_prev=beta_prev.copy(),
                            label_budget=label_budget, alpha=alpha,  cost_aware=True,model= "RS",
-                           phi=phi, eta_t= eta_t, verbose=False,  scheme="SC")
+                           phi=phi, eta_t= eta_t, scheme="SC")
 
 # Convert histories
 beta_ovbal = np.array(results_ovbal_sc[0]).squeeze()
@@ -334,13 +334,13 @@ sigma_y_rs=results_rs_sc[15]
 
 results_ovbal_bc = online_active_learning(D_L_x, D_L_y, D_U,lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha, cost_aware=True,  model= "ovbal",
-                           phi=phi, eta_t= eta_t, verbose=False, scheme="BC")
+                           phi=phi, eta_t= eta_t, scheme="BC")
 results_bia_bc = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor,  beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=True, model= "Bia",
-                           phi=phi, eta_t= eta_t, verbose=False, scheme="BC")
+                           phi=phi, eta_t= eta_t, scheme="BC")
 results_rs_bc = online_active_learning(D_L_x, D_L_y, D_U,lambda_factor=lambda_factor,  beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=True, model= "RS",
-                           phi=2, eta_t= eta_t, verbose=False, scheme="BC")
+                           phi=2, eta_t= eta_t, scheme="BC")
 
 cost_ovbal_bc = results_ovbal_bc[3]
 cost_bia_bc = results_bia_bc[3]
@@ -351,10 +351,10 @@ utility_rs_bc = results_rs_bc[7]
 # Run both ovbal and oqbcal in no_cost_aware
 results_ovbal_sc_no = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=False, model= "ovbal",
-                           phi=phi, eta_t= eta_t, verbose=True, scheme="SC")
+                           phi=phi, eta_t= eta_t, scheme="SC")
 results_ovbal_bc_no = online_active_learning(D_L_x, D_L_y, D_U,lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha, cost_aware=False,  model= "ovbal",
-                           phi=phi, eta_t= eta_t, verbose=False, scheme="BC")
+                           phi=phi, eta_t= eta_t, scheme="BC")
 
 avg_mse_ovbal_no=results_ovbal_sc_no[4]
 label_count_ovbal_no=results_ovbal_sc_no[6]
@@ -809,46 +809,41 @@ plt.tight_layout()
 plt.savefig("lt_diffrence_in_cost_aware.pdf")
 plt.show()
 
-# plot tabel for comparing cost-aware and no cost-aware OVBAL, BIA, RS
-
-methods = ["OVBAL", "BIA", "RS"]
-schemes = ["SC", "BC"]
-
-# SC results
-final_mse_sc = [avg_mse_ovbal[-1], avg_mse_bia[-1], avg_mse_rs[-1]]
-labels_sc = [label_count_ovbal, label_count_bia, label_count_rs]
-costs_sc = [cost_ovbal[-1], cost_bia[-1], cost_rs[-1]]
-utils_sc = [utility_ovbal_sc, utility_bia_sc, utility_rs_sc]
-eff_sc = np.array(utils_sc) / (np.array(costs_sc) + 1e-8)
-
-# BC results
-final_mse_bc = [results_ovbal_bc[4][-1], results_bia_bc[4][-1], results_rs_bc[4][-1]]
-labels_bc = [results_ovbal_bc[6], results_bia_bc[6], results_rs_bc[6]]
-costs_bc = [results_ovbal_bc[3][-1], results_bia_bc[3][-1], results_rs_bc[3][-1]]
-utils_bc = [results_ovbal_bc[7], results_bia_bc[7], results_rs_bc[7]]
-eff_bc = np.array(utils_bc) / (np.array(costs_bc) + 1e-8)
+# plot the comparision table for cost-aware and no cost-aware OVBAL, BIA and RS
 
 # No update
 mse_noupdate = initial_mse
 
 
+methods = ["OVBAL", "BIA", "RS", "OVBAL(no cost)"]
+schemes = ["SC", "BC"]
 
+# SC results
+final_mse_sc = [avg_mse_ovbal[-1], avg_mse_bia[-1], avg_mse_rs[-1], avg_mse_ovbal_no[-1]]
+labels_sc = [label_count_ovbal, label_count_bia, label_count_rs, label_count_ovbal_no]
+costs_sc = [cost_ovbal[-1], cost_bia[-1], cost_rs[-1], cost_ovbal_no[-1]]
+utils_sc = [utility_ovbal_sc, utility_bia_sc, utility_rs_sc, utility_ovbal_sc_no]
+eff_sc = np.array(mse_noupdate - np.array(final_mse_sc)) / (np.array(costs_sc) + 1e-8)
+
+# BC results
+final_mse_bc = [results_ovbal_bc[4][-1], results_bia_bc[4][-1], results_rs_bc[4][-1], results_ovbal_bc_no[4][-1]]
+labels_bc = [results_ovbal_bc[6], results_bia_bc[6], results_rs_bc[6], results_ovbal_bc_no[6]]
+costs_bc = [results_ovbal_bc[3][-1], results_bia_bc[3][-1], results_rs_bc[3][-1], cost_ovbal_bc_no[-1]]
+utils_bc = [results_ovbal_bc[7], results_bia_bc[7], results_rs_bc[7], results_ovbal_bc_no[7]]
+eff_bc = np.array(mse_noupdate - np.array(final_mse_bc)) / (np.array(costs_bc) + 1e-8)
+
+# Table Print
 print("=== Table: Forecasting MSE and Efficiency (ΔMSE / Cost) ===")
-print(f"{'Method':<8} | {'Scheme':<4} | {'MSE':<10} | {'#Labels':<8} | {'Cost':<10} | {'ΔMSE/Cost':<12}")
+print(f"{'Method':<16} | {'Scheme':<4} | {'MSE':<10} | {'#Labels':<8} | {'Cost':<10} | {'ΔMSE/Cost':<12}")
 print("-" * 80)
 
 for i in range(len(methods)):
-    delta = mse_noupdate - final_mse_sc[i]
-    eff = delta / (costs_sc[i] + 1e-8)
-    print(f"{methods[i]:<8} | {'SC':<4} | {final_mse_sc[i]:<10.4f} | {labels_sc[i]:<8} | {costs_sc[i]:<10.1f} | {eff:<12.2f}")
+    print(f"{methods[i]:<16} | {'SC':<4} | {final_mse_sc[i]:<10.4f} | {labels_sc[i]:<8} | {costs_sc[i]:<10.1f} | {eff_sc[i]:<12.2f}")
 
 for i in range(len(methods)):
-    delta = mse_noupdate - final_mse_bc[i]
-    eff = delta / (costs_bc[i] + 1e-8)
-    print(f"{methods[i]:<8} | {'BC':<4} | {final_mse_bc[i]:<10.4f} | {labels_bc[i]:<8} | {costs_bc[i]:<10.1f} | {eff:<12.2f}")
+    print(f"{methods[i]:<16} | {'BC':<4} | {final_mse_bc[i]:<10.4f} | {labels_bc[i]:<8} | {costs_bc[i]:<10.1f} | {eff_bc[i]:<12.2f}")
 
-print(f"{'NoUpdate':<8} | {'–':<4} | {mse_noupdate:<10.4f} | {0:<8} | {0.0:<10.1f} | {'0.00':<12}")
-
+print(f"{'NoUpdate':<16} | {'–':<4} | {mse_noupdate:<10.4f} | {0:<8} | {0.0:<10.1f} | {'0.00':<12}")
 
 
 
