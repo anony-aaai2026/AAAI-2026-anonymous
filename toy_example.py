@@ -1,12 +1,10 @@
 # Code for AAAI 2026: toy example
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
 from scipy.stats import norm
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from matplotlib import cm
-from scipy.ndimage import gaussian_filter1d
 import pandas as pd
 from numpy.linalg import pinv
 
@@ -84,6 +82,31 @@ def update_tau_online(mu_ovbal, var_ovbal, score_t, lambda_factor, alpha):
 def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev, 
                            label_budget, alpha, cost_aware, model,
                            phi, eta_t, scheme):
+    """
+    Implements Algorithm 2 (Buy-it-all, BIA) and Algorithm 3 (Random Sampling, RS)
+    from the AAAI 2026 main paper.
+
+    Parameters:
+        D_L_x (np.array): Initial labeled features (X)
+        D_L_y (np.array): Initial labeled targets (y)
+        D_U (np.array): Unlabeled data pool (features)
+        D_ML (np.array): Ground-truth labels for unlabeled pool (simulated)
+        lambda_factor (float): Forgetting factor λ (used in OVBAL and RS)
+        mu_ovbal (float): Initial UPV mean (for OVBAL)
+        var_ovbal (float): Initial UPV variance (for OVBAL)
+        beta_prev (np.array): Initial regression coefficients β₀
+        label_budget (float): Maximum allowable labeling budget B
+        alpha (float): Quantile level (1-α) for thresholding
+        cost_aware (bool): Whether to apply cost-aware query rule
+        model (str): "Bia", "RS", or "ovbal"
+        phi (float): Willingness-to-pay for the data analyst A
+        eta_t (np.array): WTS: Willingness-to-sell for data sellers St at t
+        scheme (str): "SC" (Seller-centric pricing) or "BC" (Buyer-centric pricing)
+
+    Returns:
+        Tuple of learning history variables (β_t, cost, MSE, utility, etc.)
+    """
+
     beta_t_history, H_t_inverse_history, smooth_mse_history, cost_history, forecast_error_history = [], [], [], [],[]
     tau_ovbal_history = []
     mu_ovbal_history=[]
@@ -96,7 +119,7 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
     l_j_history=[]
     sigma_y_sq_history=[]
 
-# OVBAL Step 0: Initialization
+# OVBAL Step 0: Initialization (Algorithm 1, 2 & 3)
 # -----------------------------------
 # Initialize H_0, beta_0, tau_0, sigma_y^2, c, etc.
 # Compute initial UPV statistics from D_L    
@@ -131,8 +154,9 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
 
         possibility = 0.05
 
-        # === Step 2: Determine whether to query ===
+        # === Step 2: Determine query decision based on model ===
         if model == "ovbal":
+            # Algorithm 1 (OVBAL): query if uncertainty ≥ threshold AND l_j ≥ η/ϕ
             uncertainty_score = float(x_t_aug.T @ H_prev_inv @ x_t_aug)
             score_history.append(uncertainty_score)
             query = uncertainty_score >= tau_ovbal
@@ -147,6 +171,7 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
 
 
         elif model == "Bia":
+            # Algorithm 2: Buy-it-all (always query)
             query = True
             H_virtual = lambda_factor * H_prev + x_t_aug @ x_t_aug.T
             H_virtual_inv = np.linalg.pinv(H_virtual)
@@ -154,6 +179,8 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
             l_j = sigma_y_sq_prev * np.trace(delta_H_inv)
 
         elif model == "RS":
+            # Algorithm 3: Random Sampling
+            # z_t ∼ N(0,1), query if z_t > p
             query = (np.random.rand() < possibility)
             H_virtual = lambda_factor * H_prev + x_t_aug @ x_t_aug.T
             H_virtual_inv = np.linalg.pinv(H_virtual)
@@ -162,7 +189,7 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
 
      
 
-        # === Step 2.5: Estimate price BEFORE purchasing ===
+        # === Step 2.5: Estimate label price p_t (Equation 12) ===
         if query:
             if model in ["ovbal", "Bia", "RS"]:
                 l_hat = max(0, l_j)
@@ -176,8 +203,9 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
             else:
                 raise ValueError(f"Unknown scheme: {scheme}")
 
-        # === Step 3a: Perform model update if queried ===
+        # === Step 3: If queried, update model (5a)–(5d) ===
         if query:
+            # Predict, compute residual ε_t, update β_t, H_t, σ²_y
             y_forecast_t = x_t_aug.T @ beta_prev
             epsilon_t = y_true_t - y_forecast_t
             forecast_error = (epsilon_t ** 2).item()
@@ -223,10 +251,8 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
 
 
         else:
-            # Step 4a: no purchase - model decay
-            # K_t = H_t
+            # === Step 4: If not queried (only in OVBAL & RS), decay model using (5a)-(5d) ===
             H_t = lambda_factor * H_prev
-            # H_prev = K_t
             H_t_inv = np.linalg.pinv(H_t)
             beta_t = beta_prev
             beta_prev = beta_t
@@ -252,13 +278,9 @@ def online_active_learning(D_L_x, D_L_y, D_U,  lambda_factor, beta_prev,
             var_beta_prev=var_beta
             sigma_y_sq_prev=sigma_y_sq
 
-
-
-
-
         
             if model=="ovbal":
-                # Step4b: update threshold still using score
+                # Step4b: update threshold still using (8b)
                 uncertainty_score = float(x_t_aug.T @ H_t_inv @ x_t_aug)
                 tau_ovbal, mu_ovbal, var_ovbal = update_tau_online(
                 mu_ovbal, var_ovbal, uncertainty_score, lambda_factor, alpha)
@@ -348,7 +370,8 @@ cost_rs_bc = results_rs_bc[3]
 utility_ovbal_bc = results_ovbal_bc[7]
 utility_bia_bc = results_bia_bc[7]
 utility_rs_bc = results_rs_bc[7]
-# Run both ovbal and oqbcal in no_cost_aware
+
+# Run both ovbal and oqbcal in non_cost_aware
 results_ovbal_sc_no = online_active_learning(D_L_x, D_L_y, D_U, lambda_factor=lambda_factor, beta_prev=beta_prev.copy(), 
                            label_budget=label_budget, alpha=alpha,  cost_aware=False, model= "ovbal",
                            phi=phi, eta_t= eta_t, scheme="SC")
@@ -374,7 +397,7 @@ score_history=results_ovbal_sc[12]
 
 
 
-# Per-feature tracking error
+# Per-feature tracking error, Figure (2)
 per_feature_err_ovbal = compute_per_feature_tracking_error(beta_ovbal, true_beta)
 per_feature_err_sl = compute_per_feature_tracking_error(beta_bia, true_beta)
 per_feature_err_rs = compute_per_feature_tracking_error(beta_rs, true_beta)
@@ -415,7 +438,7 @@ plt.show()
 
 
 # Align learner curves to baseline final MSE at t=0
-# === Baseline: No Update (before any model is trained on D_U) ===
+# === Baseline: No Update (always predict using initial beta and compute the mse over time) ===
 beta_baseline = beta_prev.copy()
 mse_no_update = []
 mse=0
@@ -455,7 +478,7 @@ for mse, cost in zip(avg_mse_all, costs_all):
 
 zoom_x_max = min(len(query_curves[0][0]), len(query_curves[2][0])) 
 
-# === Plot ===
+# === Plot Figure (3b) ===
 fig, axs = plt.subplots(1, 2, figsize=(13.5, 4.8), sharey=True)
 
 # Full Curve
@@ -490,17 +513,6 @@ avg_mse_all = [avg_mse_ovbal,  avg_mse_bia, avg_mse_rs]
 costs_all = [cost_ovbal, cost_bia, cost_rs]
 colors = ["blue", "green", "red"]
 
-# plt.figure(figsize=(7.5, 5))
-# for method, mse_hist, cost_hist, color in zip(methods, avg_mse_all, costs_all, colors):
-#     x, y = extract_query_mse(mse_hist, cost_hist)
-#     plt.plot(range(1, len(y) + 1), y, label=method, linestyle="-", linewidth=2)
-# plt.xlabel("Queried Labels")
-# plt.ylabel("Forecasting MSE")
-# plt.legend()
-# plt.grid(False)
-# plt.tight_layout()
-# plt.savefig("mse_vs_queried_labels.pdf")
-# plt.show()
 
 
 def extract_query_cost_mse_threshold(mse_hist, cost_hist, threshold=np.inf):
@@ -530,7 +542,7 @@ for mse, cost in zip(mse_all, cost_all):
 
 zoom_cost_max = 121
 
-# === Plot ===
+# === Plot Figure (3a)===
 fig, axs = plt.subplots(1, 2, figsize=(13.5, 4.8), sharey=True)
 
 # Full Curve
@@ -557,40 +569,11 @@ plt.savefig("mse_vs_cost_spent_zoom_compare.pdf")
 plt.show()
 
 
-# def extract_query_cost_mse_threshold(mse_hist, cost_hist, threshold=10000):
-#     query_costs = []
-#     query_mse = []
-#     last_cost = 0
-#     for i in range(len(cost_hist)):
-#         if i >= len(mse_hist):
-#             break
-#         if cost_hist[i] > last_cost:
-#             if cost_hist[i] > threshold:
-#                 break
-#             query_costs.append(cost_hist[i])
-#             query_mse.append(mse_hist[i])
-#             last_cost = cost_hist[i]
-#     return query_costs, query_mse
-# methods = ["OVBAL", "BIA", "RS"]
-# mse_all = [avg_mse_ovbal,  avg_mse_bia, avg_mse_rs]
-# cost_all = [cost_ovbal, cost_bia, cost_rs]
-# plt.figure(figsize=(7, 4.2))
-# for m, mse, cost in zip(methods, mse_all, cost_all):
-#     q_costs, q_mses = extract_query_cost_mse_threshold(mse, cost, threshold=10000)
-#     plt.plot(q_costs, q_mses, label=m)
-# plt.xlabel("Cost Spent")
-# plt.ylabel("Forecasting MSE")
-# plt.legend()
-# plt.grid(False)
-# plt.tight_layout()
-# plt.show()
-
-
 
 
 fig, axs = plt.subplots(1, 2, figsize=(13.5, 4.8), sharey=True)
 
-# SC Pricing
+# Plot Figure (4a) left-SC Pricing
 axs[0].plot(cost_ovbal, label="OVBAL", linestyle="-")
 axs[0].plot(cost_bia, label="BIA", linestyle="-.")
 axs[0].plot(cost_rs, label="RS", linestyle="--")
@@ -602,13 +585,13 @@ axs[0].tick_params(axis='x', labelsize=20)
 axs[0].tick_params(axis='y',labelsize=20)
 axs[0].legend(fontsize=18)
 
-# BC Pricing
+# Plot Figure (4a) right-BC Pricing
 axs[1].plot(cost_ovbal_bc, label="OVBAL", linestyle="-")
 axs[1].plot(cost_bia_bc, label="BIA ", linestyle="-.")
 axs[1].plot(cost_rs_bc, label="RS ", linestyle="--")
 axs[1].axhline(label_budget, color='red', linestyle='--', linewidth=3)
 axs[1].text(len(cost_ovbal_bc)*0.55, label_budget*0.9, 'Budget Limit', color='red',fontsize=18)
-axs[1].set_xlabel("Time step",fontsize=20)
+axs[1].set_xlabel("Time step",fontsize=25)
 axs[1].tick_params(axis='x', labelsize=20)
 axs[1].tick_params(axis='y', labelsize=20)
 axs[1].legend(fontsize=18)
@@ -622,9 +605,8 @@ plt.show()
 
 
 
-# --- Follwed by further analysis which is not included in the main paper ---
+# --- Follwed by further analysis which is not included in the main paper, to see the results please uncommand the code ---
 
-baseline_curve = [initial_mse] * len(avg_mse_ovbal)  # constant line for baseline
 plt.figure(figsize=(7.2, 4.5))
 plt.plot(avg_mse_ovbal, label="OVBAL", linestyle="-")
 plt.plot(avg_mse_bia, label="BIA", linestyle="-.")
@@ -651,8 +633,6 @@ for i, ax in enumerate(axs):
     if i == 0:
         ax.set_ylabel("β value")
     ax.grid(False)
-
-# Add legend only once
 axs[0].legend(loc="upper left", ncol=1)
 plt.tight_layout()
 plt.savefig("beta_evolution_all_methods.pdf")
@@ -799,7 +779,6 @@ plt.savefig("utility_over_time_subplots.pdf")
 plt.show()
 
 
-
 plt.plot(l_j_history, label="Cost-Aware")
 plt.plot(l_j_history_no, label="No-Cost-Aware")
 plt.xlabel("Time step")
@@ -809,7 +788,7 @@ plt.tight_layout()
 plt.savefig("lt_diffrence_in_cost_aware.pdf")
 plt.show()
 
-# plot the comparision table for cost-aware and no cost-aware OVBAL, BIA and RS
+# plot the comparision table (Table 1) for cost-aware and no cost-aware OVBAL, BIA and RS
 
 # No update
 mse_noupdate = initial_mse
@@ -844,6 +823,7 @@ for i in range(len(methods)):
     print(f"{methods[i]:<16} | {'BC':<4} | {final_mse_bc[i]:<10.4f} | {labels_bc[i]:<8} | {costs_bc[i]:<10.1f} | {eff_bc[i]:<12.2f}")
 
 print(f"{'NoUpdate':<16} | {'–':<4} | {mse_noupdate:<10.4f} | {0:<8} | {0.0:<10.1f} | {'0.00':<12}")
+
 
 
 
